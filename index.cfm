@@ -17,10 +17,11 @@
 <p>By default, the controller model is assumed to be named as the singular of the controller name. So, Users controller = User model.</p>
 <p>AutoCRUD adds methods for the following controller actions:</p>
 <ul>
-	<li>index(): calls findAll() on the controller model, returns it as the controller name and renders index.cfm in the controller's view folder. Supports pagination.</li>
+	<li>index(): calls findAll() on the controller model, returns it as the controller name and renders index.cfm in the controller's view folder. Supports pagination. Use the URL parameter &quot;showdeleted=true&quot; to return the list of deleted models.</li>
 	<li>new(): creates	a blank controller model and renders the edit page. If it receives a form submission containing a key in the params scope that matches the controller model, it saves those properties into the blank model and attempts to save it. If succesful, it writes a message to the flash with the key 'success' and redirects to the index action. If the model was not saved it re-render's the action's template (edit.cfm by default).</li>
 	<li>edit(): reads the controller model from the database using params.key. If it receives a form submission as described above, it updates the model with the supplied properites, adds a message to the flash with the key 'success' and redirects to the index action. If it cannot update, it re-render's the action's template (edit.cfm by default).</li>
 	<li>delete(): reads the controller model from the database using params.key, calls its delete method, adds a message to the flash with the key 'success' and redirects to the index action. If it cannot delete, it writes a message to the flash with the key 'error'.</li>
+	<li>restore(): reads the controller model from the database using params.key, calls an update method to set the deletedat property to NULL, adds a message to the flash with the key 'success' and redirects to the index action. If it cannot restore, it writes a message to the flash with the key 'error'.</li>
 	<li>loadModel(): a helper method that attempts to load the controller model from the database by using params.key, returning false if it cannot be found.</li>
 </ul>
 <h2>Say what?</h2>
