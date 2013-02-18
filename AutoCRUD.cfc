@@ -4,13 +4,13 @@
 	<!--- setup and configuation --->
 	
 	<cffunction name="init" output="false">
-		<cfset this.version = "1.1,1.1.1,1.1.2,1.1.3,1.1.4,1.1.5,1.1.6,1.1.7">
+		<cfset this.version = "1.1,1.1.1,1.1.2,1.1.3,1.1.4,1.1.5,1.1.6,1.1.7,1.1.8">
 		<cfreturn this>
 	</cffunction>
 	
 	
 	<cffunction name="autoCRUD" returntype="void" output="false" mixin="controller">
-		<cfargument name="only" type="string" default="index,new,edit,delete" hint="I am a list of actions that the autoCRUD will override.">
+		<cfargument name="only" type="string" default="index,new,edit,delete,restore" hint="I am a list of actions that the autoCRUD will override.">
 		<cfargument name="except" type="string" default="" hint="I am a list of actions that the autoCRUD will NOT override.">
 		<cfargument name="modelName" type="string" default="#Singularize(variables.$class.name)#" hint="I am the name of the controller's default model (defaults to the singular of the controller name).">
 		<cfargument name="modelVariable" type="string" default="#arguments.modelName#" hint="I am the name of the variable used to store the controller's default model (defaults to the model name).">
@@ -32,6 +32,12 @@
 		<cfargument name="afterDeleteRoute" type="string" default="" hint="I am an optional route to redirect to after a successful delete (defaults to blank).">
 		<cfargument name="afterDeleteMessage" type="string" default="[modelDisplayName] has been successfully deleted." hint="I am an optional message to store in the flash after a successful delete.">
 		<cfargument name="failedDeleteMessage" type="string" default="[modelDisplayName] could not be deleted." hint="I am an optional message to store in the flash after a failed delete.">
+		<cfargument name="afterRestoreKey" type="string" default="" hint="I am the location of a key to be used after a successful restore (defaults to blank).">
+		<cfargument name="afterRestoreController" type="string" default="#variables.$class.name#" hint="I am the controller to redirect to after a successful restore (defaults to the current controller).">
+		<cfargument name="afterRestoreAction" type="string" default="" hint="I am the action to redirect to after a successful restore (defaults to 'index').">
+		<cfargument name="afterRestoreRoute" type="string" default="" hint="I am an optional route to redirect to after a successful restore (defaults to blank).">
+		<cfargument name="afterRestoreMessage" type="string" default="[modelDisplayName] has been successfully restored." hint="I am an optional message to store in the flash after a successful restore.">
+		<cfargument name="failedRestoreMessage" type="string" default="[modelDisplayName] could not be restored." hint="I am an optional message to store in the flash after a failed restore.">
 		<cfargument name="controllerParams" type="string" default="" hint="I am a comma delimited list of params to be excluded when automatically populating the controller's default model from the params struct.">
 		<cfset variables.$class.autoCRUD = Duplicate(arguments)>
 		<cfset variables.$class.autoCRUD.controllerParams = ListAppend(variables.$class.autoCRUD.controllerParams, "route,controller,action,key")>
@@ -130,6 +136,26 @@
 		<cfset variables.$class.autoCRUD.afterDeleteRoute = arguments.afterDeleteRoute>
 	</cffunction>
 
+	<cffunction name="setAfterRestoreKey" returntype="void" access="public" mixin="controller">
+		<cfargument name="afterRestoreKey" type="string" required="true">
+		<cfset variables.$class.autoCRUD.afterRestoreKey = arguments.afterRestoreKey>
+	</cffunction>
+
+	<cffunction name="setAfterRestoreController" returntype="void" access="public" mixin="controller">
+		<cfargument name="afterRestoreController" type="string" required="true">
+		<cfset variables.$class.autoCRUD.afterRestoreController = arguments.afterRestoreController>
+	</cffunction>
+
+	<cffunction name="setAfterRestoreAction" returntype="void" access="public" mixin="controller">
+		<cfargument name="afterRestoreAction" type="string" required="true">
+		<cfset variables.$class.autoCRUD.afterRestoreAction = arguments.afterRestoreAction>
+	</cffunction>
+
+	<cffunction name="setAfterRestoreRoute" returntype="void" access="public" mixin="controller">
+		<cfargument name="afterRestoreRoute" type="string" required="true">
+		<cfset variables.$class.autoCRUD.afterRestoreRoute = arguments.afterRestoreRoute>
+	</cffunction>
+
 	<cffunction name="setControllerParams" returntype="void" access="public" mixin="controller">
 		<cfargument name="controllerParams" type="string" required="true">
 		<cfset variables.$class.autoCRUD.controllerParams = ListAppend(variables.$class.autoCRUD.controllerParams, arguments.controllerParams)>
@@ -166,6 +192,12 @@
 		</cfif>
 	</cffunction>
 
+	<cffunction name="restore" mixin="controller">
+		<cfif StructKeyExists(variables.$class, "autoCRUD") and ListFindNoCase(variables.$class.autoCRUD.only, "restore") and not ListFindNoCase(variables.$class.autoCRUD.except, "restore")>
+			<cfset autoRestore(argumentCollection=arguments)>
+		</cfif>
+	</cffunction>
+
 
 
 	<!--- autoCRUD actions --->
@@ -178,10 +210,19 @@
 		<cfargument name="perPage" type="numeric" default="#variables.$class.autoCRUD.perPage#" hint="Passed through to the findAll() method for pagination.">
 		<cfargument name="template" type="string" default="index" hint="I am the name of this action's template file.">
 		<cfset variables.$autoCRUD = Duplicate(arguments)>
-		<cfif arguments.perPage gt 0>
-			<cfset variables[Pluralize(arguments.modelVariable)] = model(arguments.modelName).findAll(page=arguments.page, perPage=arguments.perPage)>	
+		 
+		<cfif IsDefined("params.showdeleted")>
+			<cfif arguments.perPage gt 0>
+				<cfset variables[Pluralize(arguments.modelVariable)] = model(arguments.modelName).findAll(page=arguments.page, perPage=arguments.perPage, includeSoftDeletes='true')>	
+			<cfelse>
+				<cfset variables[Pluralize(arguments.modelVariable)] = model(arguments.modelName).findAll(where='#get("softDeleteProperty")# IS NOT NULL', includeSoftDeletes='true')>
+			</cfif>
 		<cfelse>
-			<cfset variables[Pluralize(arguments.modelVariable)] = model(arguments.modelName).findAll()>
+			<cfif arguments.perPage gt 0>
+				<cfset variables[Pluralize(arguments.modelVariable)] = model(arguments.modelName).findAll(page=arguments.page, perPage=arguments.perPage)>	
+			<cfelse>
+				<cfset variables[Pluralize(arguments.modelVariable)] = model(arguments.modelName).findAll()>
+			</cfif>
 		</cfif>
 		<cfset renderPage(template=arguments.template)>
 	</cffunction>
@@ -264,9 +305,47 @@
 			</cfif>
 		</cfif>
 		<cfset arguments.actionType = "delete">
-		<cfset redirectTo(argumentCollection=$getRedirectArguments(argumentCollection=arguments))>
+		<cfif IsAjax()>
+			<cfset renderNothing()>
+		<cfelse>
+			<cfset redirectTo(argumentCollection=$getRedirectArguments(argumentCollection=arguments))>
+		</cfif>
 	</cffunction>
 
+
+	<cffunction name="autoRestore" mixin="controller">
+		<cfargument name="modelName" type="string" default="#variables.$class.autoCRUD.modelName#" hint="I am the name of the action's model (defaults to the controller's default model name).">
+		<cfargument name="modelVariable" type="string" default="#arguments.modelName#" hint="I am the name of the variable used to store the action's default model (defaults to the actions model name).">
+		<cfargument name="modelDisplayName" type="string" default="#Humanize(arguments.modelName)#" hint="I am the display name of the action's default model (defaults to the humanized action's model name).">
+		<cfargument name="afterRestoreKey" type="string" default="#variables.$class.autoCRUD.afterRestoreKey#" hint="I am the location of a key to be used after a successful restore (defaults to blank).">
+		<cfargument name="afterRestoreController" type="string" default="#variables.$class.autoCRUD.afterRestoreController#" hint="I am the controller to redirect to after a successful restore (defaults to current controller).">
+		<cfargument name="afterRestoreAction" type="string" default="#variables.$class.autoCRUD.afterRestoreAction#" hint="I am the action to redirect to after a successful restore (defaults to 'index').">
+		<cfargument name="afterRestoreRoute" type="string" default="#variables.$class.autoCRUD.afterRestoreRoute#" hint="I am an optional route to redirect to after a successful restore (defaults to blank).">
+		<cfargument name="afterRestoreMessage" type="string" default="#variables.$class.autoCRUD.afterRestoreMessage#" hint="I am an optional message to store in the flash after a successful restore.">
+		<cfargument name="failedRestoreMessage" type="string" default="#variables.$class.autoCRUD.failedRestoreMessage#" hint="I am an optional message to store in the flash if a restore is unsuccessful.">
+		<cfargument name="showdeleted" type="string" default="true" hint="I tell the $loadModel() method to return deleted entries otherwise there's no object to restore.">
+		<cfset variables.$autoCRUD = Duplicate(arguments)>
+		<cfif not StructKeyExists(variables, arguments.modelVariable)>
+			<cfset variables[arguments.modelVariable] = $loadModel(argumentCollection=arguments)>
+		</cfif>
+		<cfset updatePropertiesStruct = {}>
+		<cfset updatePropertiesStruct[get("softDeleteProperty")] = 'NULL'>
+		<cfif IsObject(variables[arguments.modelVariable]) and variables[arguments.modelVariable].update(properties=updatePropertiesStruct)>
+			<cfif Len(arguments.afterRestoreMessage)>
+				<cfset flashInsert(success=Replace(arguments.afterRestoreMessage, "[modelDisplayName]", Humanize(arguments.modelName), "all"))>
+			</cfif>
+		<cfelse>	
+			<cfif Len(arguments.failedRestoreMessage)>
+				<cfset flashInsert(error=Replace(arguments.failedRestoreMessage, "[modelDisplayName]", Humanize(arguments.modelName), "all"))>
+			</cfif>
+		</cfif>
+		<cfset arguments.actionType = "restore">
+		<cfif IsAjax()>
+			<cfset renderNothing()>
+		<cfelse>
+			<cfset redirectTo(argumentCollection=$getRedirectArguments(argumentCollection=arguments))>
+		</cfif>
+	</cffunction>
 
 
 	<!--- internal helper methods --->
@@ -275,7 +354,12 @@
 		<cfargument name="modelName" type="string" default="#variables.$class.autoCRUD.modelName#" hint="I am the name of the model (defaults to the controller's default model name).">
 		<cfif StructKeyExists(variables.params, "key")>
 			<cfset arguments.key = variables.params.key>
-			<cfreturn model(arguments.modelName).findByKey(argumentCollection=arguments)>
+			<cfif IsDefined("arguments.showdeleted")>
+				<cfset arguments.includeSoftDeletes = true>
+				<cfreturn model(arguments.modelName).findByKey(argumentCollection=arguments)>
+			<cfelse>
+				<cfreturn model(arguments.modelName).findByKey(argumentCollection=arguments)>
+			</cfif>
 		</cfif>
 		<cfreturn false>
 	</cffunction>
@@ -295,6 +379,10 @@
 		<cfargument name="afterDeleteController" type="string" default="">
 		<cfargument name="afterDeleteAction" type="string" default="">
 		<cfargument name="afterDeleteRoute" type="string" default="">
+		<cfargument name="afterRestoreKey" type="string" default="">
+		<cfargument name="afterRestoreController" type="string" default="">
+		<cfargument name="afterRestoreAction" type="string" default="">
+		<cfargument name="afterRestoreRoute" type="string" default="">
 
 		<cfset var redirectArgs = StructNew()>
 		
@@ -330,6 +418,17 @@
 				</cfif>
 				<cfif Len(arguments.afterDeleteKey) and IsDefined(arguments.afterDeleteKey)>
 					<cfset redirectArgs.key = Evaluate(arguments.afterDeleteKey)>
+				</cfif>
+			</cfcase>
+			<cfcase value="restore">
+				<cfif Len(arguments.afterRestoreRoute)>
+					<cfset redirectArgs.route = arguments.afterRestoreRoute>
+				<cfelse>
+					<cfset redirectArgs.controller = arguments.afterRestoreController>
+					<cfset redirectArgs.action = arguments.afterRestoreAction>
+				</cfif>
+				<cfif Len(arguments.afterRestoreKey) and IsDefined(arguments.afterRestoreKey)>
+					<cfset redirectArgs.key = Evaluate(arguments.afterRestoreKey)>
 				</cfif>
 			</cfcase>
 		</cfswitch>
