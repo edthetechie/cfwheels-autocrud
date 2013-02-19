@@ -22,6 +22,7 @@
 	<li>edit(): reads the controller model from the database using params.key. If it receives a form submission as described above, it updates the model with the supplied properites, adds a message to the flash with the key 'success' and redirects to the index action. If it cannot update, it re-render's the action's template (edit.cfm by default).</li>
 	<li>delete(): reads the controller model from the database using params.key, calls its delete method, adds a message to the flash with the key 'success' and redirects to the index action. If it cannot delete, it writes a message to the flash with the key 'error'.</li>
 	<li>restore(): reads the controller model from the database using params.key, calls an update method to set the deletedat property to NULL, adds a message to the flash with the key 'success' and redirects to the index action. If it cannot restore, it writes a message to the flash with the key 'error'.</li>
+	<li>expunge(): reads the controller model from the database using params.key, calls its delete method with the "includeSoftDeletes" property set to "true" and "softDelete" property set to false thus permanently removing it. Then adds a message to the flash with the key 'success' and redirects to the index action. If it cannot restore, it writes a message to the flash with the key 'error'.</li>
 	<li>loadModel(): a helper method that attempts to load the controller model from the database by using params.key, returning false if it cannot be found.</li>
 </ul>
 <h2>Say what?</h2>
