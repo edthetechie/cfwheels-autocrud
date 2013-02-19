@@ -10,7 +10,7 @@
 	
 	
 	<cffunction name="autoCRUD" returntype="void" output="false" mixin="controller">
-		<cfargument name="only" type="string" default="index,new,edit,delete,restore" hint="I am a list of actions that the autoCRUD will override.">
+		<cfargument name="only" type="string" default="index,new,edit,delete,restore,expunge" hint="I am a list of actions that the autoCRUD will override.">
 		<cfargument name="except" type="string" default="" hint="I am a list of actions that the autoCRUD will NOT override.">
 		<cfargument name="modelName" type="string" default="#Singularize(variables.$class.name)#" hint="I am the name of the controller's default model (defaults to the singular of the controller name).">
 		<cfargument name="modelVariable" type="string" default="#arguments.modelName#" hint="I am the name of the variable used to store the controller's default model (defaults to the model name).">
@@ -38,6 +38,12 @@
 		<cfargument name="afterRestoreRoute" type="string" default="" hint="I am an optional route to redirect to after a successful restore (defaults to blank).">
 		<cfargument name="afterRestoreMessage" type="string" default="[modelDisplayName] has been successfully restored." hint="I am an optional message to store in the flash after a successful restore.">
 		<cfargument name="failedRestoreMessage" type="string" default="[modelDisplayName] could not be restored." hint="I am an optional message to store in the flash after a failed restore.">
+		<cfargument name="afterExpungeKey" type="string" default="" hint="I am the location of a key to be used after a successful expunge (defaults to blank).">
+		<cfargument name="afterExpungeController" type="string" default="#variables.$class.name#" hint="I am the controller to redirect to after a successful expunge (defaults to the current controller).">
+		<cfargument name="afterExpungeAction" type="string" default="" hint="I am the action to redirect to after a successful expunge (defaults to 'index').">
+		<cfargument name="afterExpungeRoute" type="string" default="" hint="I am an optional route to redirect to after a successful expunge (defaults to blank).">
+		<cfargument name="afterExpungeMessage" type="string" default="[modelDisplayName] has been permanently deleted." hint="I am an optional message to store in the flash after a successful expunge.">
+		<cfargument name="failedExpungeMessage" type="string" default="[modelDisplayName] could not be permanently deleted." hint="I am an optional message to store in the flash after a failed expunge.">
 		<cfargument name="controllerParams" type="string" default="" hint="I am a comma delimited list of params to be excluded when automatically populating the controller's default model from the params struct.">
 		<cfset variables.$class.autoCRUD = Duplicate(arguments)>
 		<cfset variables.$class.autoCRUD.controllerParams = ListAppend(variables.$class.autoCRUD.controllerParams, "route,controller,action,key")>
@@ -156,6 +162,26 @@
 		<cfset variables.$class.autoCRUD.afterRestoreRoute = arguments.afterRestoreRoute>
 	</cffunction>
 
+	<cffunction name="setAfterExpungeKey" returntype="void" access="public" mixin="controller">
+		<cfargument name="afterExpungeKey" type="string" required="true">
+		<cfset variables.$class.autoCRUD.afterExpungeKey = arguments.afterExpungeKey>
+	</cffunction>
+
+	<cffunction name="setAfterExpungeController" returntype="void" access="public" mixin="controller">
+		<cfargument name="afterExpungeController" type="string" required="true">
+		<cfset variables.$class.autoCRUD.afterExpungeController = arguments.afterExpungeController>
+	</cffunction>
+
+	<cffunction name="setAfterExpungeAction" returntype="void" access="public" mixin="controller">
+		<cfargument name="afterExpungeAction" type="string" required="true">
+		<cfset variables.$class.autoCRUD.afterExpungeAction = arguments.afterExpungeAction>
+	</cffunction>
+
+	<cffunction name="setAfterExpungeRoute" returntype="void" access="public" mixin="controller">
+		<cfargument name="afterExpungeRoute" type="string" required="true">
+		<cfset variables.$class.autoCRUD.afterExpungeRoute = arguments.afterExpungeRoute>
+	</cffunction>
+
 	<cffunction name="setControllerParams" returntype="void" access="public" mixin="controller">
 		<cfargument name="controllerParams" type="string" required="true">
 		<cfset variables.$class.autoCRUD.controllerParams = ListAppend(variables.$class.autoCRUD.controllerParams, arguments.controllerParams)>
@@ -198,6 +224,11 @@
 		</cfif>
 	</cffunction>
 
+	<cffunction name="expunge" mixin="controller">
+		<cfif StructKeyExists(variables.$class, "autoCRUD") and ListFindNoCase(variables.$class.autoCRUD.only, "expunge") and not ListFindNoCase(variables.$class.autoCRUD.except, "expunge")>
+			<cfset autoExpunge(argumentCollection=arguments)>
+		</cfif>
+	</cffunction>
 
 
 	<!--- autoCRUD actions --->
@@ -347,6 +378,39 @@
 		</cfif>
 	</cffunction>
 
+
+
+	<cffunction name="autoExpunge" mixin="controller">
+		<cfargument name="modelName" type="string" default="#variables.$class.autoCRUD.modelName#" hint="I am the name of the action's model (defaults to the controller's default model name).">
+		<cfargument name="modelVariable" type="string" default="#arguments.modelName#" hint="I am the name of the variable used to store the action's default model (defaults to the actions model name).">
+		<cfargument name="modelDisplayName" type="string" default="#Humanize(arguments.modelName)#" hint="I am the display name of the action's default model (defaults to the humanized action's model name).">
+		<cfargument name="afterExpungeKey" type="string" default="#variables.$class.autoCRUD.afterExpungeKey#" hint="I am the location of a key to be used after a successful expunge (defaults to blank).">
+		<cfargument name="afterExpungeController" type="string" default="#variables.$class.autoCRUD.afterExpungeController#" hint="I am the controller to redirect to after a successful expunge (defaults to current controller).">
+		<cfargument name="afterExpungeAction" type="string" default="#variables.$class.autoCRUD.afterExpungeAction#" hint="I am the action to redirect to after a successful expunge (defaults to 'index').">
+		<cfargument name="afterExpungeRoute" type="string" default="#variables.$class.autoCRUD.afterExpungeRoute#" hint="I am an optional route to redirect to after a successful expunge (defaults to blank).">
+		<cfargument name="afterExpungeMessage" type="string" default="#variables.$class.autoCRUD.afterExpungeMessage#" hint="I am an optional message to store in the flash after a successful expunge.">
+		<cfargument name="failedExpungeMessage" type="string" default="#variables.$class.autoCRUD.failedExpungeMessage#" hint="I am an optional message to store in the flash if a expunge is unsuccessful.">
+		<cfargument name="showdeleted" type="string" default="true" hint="I tell the $loadModel() method to return deleted entries otherwise there's no object to restore.">
+		<cfset variables.$autoCRUD = Duplicate(arguments)>
+		<cfif not StructKeyExists(variables, arguments.modelVariable)>
+			<cfset variables[arguments.modelVariable] = $loadModel(argumentCollection=arguments)>
+		</cfif>
+		<cfif IsObject(variables[arguments.modelVariable]) and variables[arguments.modelVariable].delete(includeSoftDeletes="true", softDelete="false")>
+			<cfif Len(arguments.afterExpungeMessage)>
+				<cfset flashInsert(success=Replace(arguments.afterExpungeMessage, "[modelDisplayName]", Humanize(arguments.modelName), "all"))>
+			</cfif>
+		<cfelse>	
+			<cfif Len(arguments.failedExpungeMessage)>
+				<cfset flashInsert(error=Replace(arguments.failedExpungeMessage, "[modelDisplayName]", Humanize(arguments.modelName), "all"))>
+			</cfif>
+		</cfif>
+		<cfset arguments.actionType = "expunge">
+		<cfif IsAjax()>
+			<cfset renderNothing()>
+		<cfelse>
+			<cfset redirectTo(argumentCollection=$getRedirectArguments(argumentCollection=arguments))>
+		</cfif>
+	</cffunction>
 
 	<!--- internal helper methods --->
 
